@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calculator, Home, Plus, Info, LogOut, User, LogIn } from 'lucide-react';
+import { Calculator, Home, Plus, Info, LogOut, User, LogIn, Sigma } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Header: React.FC = () => {
@@ -34,9 +34,12 @@ const Header: React.FC = () => {
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <Link 
             to="/" 
-            className="flex items-center space-x-3 text-white hover:text-blue-200 transition-colors"
+            className="flex items-center space-x-3 text-white hover:text-blue-200 transition-colors group"
           >
-            <Calculator size={32} className="text-blue-300" />
+            <div className="relative">
+              <Sigma size={32} className="text-blue-300 group-hover:text-blue-200 transition-colors" />
+              <Calculator size={18} className="absolute -bottom-1 -right-1 text-purple-300 group-hover:text-purple-200 transition-colors" />
+            </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
               EG Math Hub
             </span>
