@@ -7,8 +7,8 @@ interface LoginFormProps {
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('demo@example.com');
+  const [password, setPassword] = useState('demo123');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,10 +19,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     setIsLoading(true);
     setError('');
 
-    // Simulate loading delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    const success = login(username, password);
+    const success = await login(email, password);
     
     if (success) {
       onSuccess();
@@ -47,16 +44,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-white/80 text-sm font-medium mb-2">
-              Username
+              Email
             </label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60" size={18} />
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
-                placeholder="Enter username"
+                placeholder="Enter email"
                 required
               />
             </div>
@@ -110,7 +107,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
 
         <div className="mt-6 text-center">
           <p className="text-white/50 text-xs">
-            Admin access only • EG Math Hub
+            Demo credentials: demo@example.com / demo123
           </p>
         </div>
       </div>

@@ -1,72 +1,73 @@
 import React, { useState } from 'react';
 import { Save, Upload, Plus, X, FileText, BarChart3, Users, BookOpen } from 'lucide-react';
-import { allTags, categories } from '../data/mockArticles';
+import { categories } from '../data/mockArticles';
+import { apiService } from '../services/api';
+import { useArticles } from '../hooks/useArticles';
 
 interface NewArticle {
   title: string;
-  summary: string;
   content: string;
-  author: string;
   category: string;
-  tags: string[];
-  attachments: File[];
+  tags: string;
 }
 
 const DashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'add-article'>('overview');
   const [article, setArticle] = useState<NewArticle>({
     title: '',
-    summary: '',
     content: '',
-    author: '',
     category: categories[1], // Skip 'All'
-    tags: [],
-    attachments: []
+    tags: ''
   });
 
-  const [newTag, setNewTag] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
+  const { articles, refetch } = useArticles();
 
   const handleInputChange = (field: keyof NewArticle, value: string) => {
     setArticle(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleTagAdd = (tag: string) => {
-    if (tag && !article.tags.includes(tag)) {
-      setArticle(prev => ({ ...prev, tags: [...prev.tags, tag] }));
-    }
-    setNewTag('');
-  };
-
-  const handleTagRemove = (tag: string) => {
-    setArticle(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
-  };
-
-  const handleFileUpload = (files: FileList | null) => {
-    if (files) {
-      const newFiles = Array.from(files);
-      setArticle(prev => ({ ...prev, attachments: [...prev.attachments, ...newFiles] }));
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Submitting article:', article);
-    alert('Article submitted successfully! (This is a demo)');
-    
-    // Reset form
-    setArticle({
-      title: '',
-      summary: '',
-      content: '',
-      author: '',
-      category: categories[1],
-      tags: [],
-      attachments: []
-    });
+    setIsSubmitting(true);
+    setSubmitMessage('');
+
+    try {
+      await apiService.createArticle({
+        title: article.title,
+        content: article.content,
+        category: article.category,
+        tags: article.tags
+      });
+
+      setSubmitMessage('Article created successfully!');
+      
+      // Reset form
+      setArticle({
+        title: '',
+        content: '',
+        category: categories[1],
+        tags: ''
+      });
+
+      // Refresh articles list
+      refetch();
+      
+      // Switch to overview tab to see the new article
+      setTimeout(() => {
+        setActiveTab('overview');
+      }, 1500);
+
+    } catch (error) {
+      setSubmitMessage(`Error: ${error instanceof Error ? error.message : 'Failed to create article'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const stats = [
-    { label: 'Total Articles', value: '12', icon: BookOpen, color: 'text-blue-400' },
+    { label: 'Total Articles', value: articles.length.toString(), icon: BookOpen, color: 'text-blue-400' },
     { label: 'Total Views', value: '1,234', icon: BarChart3, color: 'text-green-400' },
     { label: 'Active Readers', value: '89', icon: Users, color: 'text-purple-400' },
   ];
@@ -124,31 +125,26 @@ const DashboardPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Recent Activity */}
+          {/* Recent Articles */}
           <div className="glass-card p-6 slide-in">
-            <h2 className="text-xl font-bold text-white mb-4">Recent Activity</h2>
+            <h2 className="text-xl font-bold text-white mb-4">Recent Articles</h2>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <span className="text-white">New article published: "Advanced Calculus"</span>
+              {articles.slice(0, 5).map((article) => (
+                <div key={article.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span className="text-white">{article.title}</span>
+                  </div>
+                  <span className="text-white/60 text-sm">
+                    {new Date(article.publishDate).toLocaleDateString()}
+                  </span>
                 </div>
-                <span className="text-white/60 text-sm">2 hours ago</span>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                  <span className="text-white">Article updated: "Quantum Mechanics"</span>
+              ))}
+              {articles.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-white/60">No articles yet. Create your first article!</p>
                 </div>
-                <span className="text-white/60 text-sm">1 day ago</span>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                  <span className="text-white">New reader milestone reached</span>
-                </div>
-                <span className="text-white/60 text-sm">3 days ago</span>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -181,113 +177,35 @@ const DashboardPage: React.FC = () => {
 
               <div>
                 <label className="block text-white/80 text-sm font-medium mb-2">
-                  Author *
+                  Category *
                 </label>
-                <input
-                  type="text"
-                  value={article.author}
-                  onChange={(e) => handleInputChange('author', e.target.value)}
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  placeholder="Author name..."
+                <select
+                  value={article.category}
+                  onChange={(e) => handleInputChange('category', e.target.value)}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
                   required
-                />
+                >
+                  {categories.slice(1).map((category) => (
+                    <option key={category} value={category} className="bg-gray-800">
+                      {category}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-white/80 text-sm font-medium mb-2">
-                Summary *
-              </label>
-              <textarea
-                value={article.summary}
-                onChange={(e) => handleInputChange('summary', e.target.value)}
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
-                rows={3}
-                placeholder="Brief summary of the article..."
-                required
-              />
-            </div>
-
-            {/* Category Selection */}
-            <div>
-              <label className="block text-white/80 text-sm font-medium mb-2">
-                Category *
-              </label>
-              <select
-                value={article.category}
-                onChange={(e) => handleInputChange('category', e.target.value)}
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                required
-              >
-                {categories.slice(1).map((category) => (
-                  <option key={category} value={category} className="bg-gray-800">
-                    {category}
-                  </option>
-                ))}
-              </select>
             </div>
 
             {/* Tags */}
             <div>
               <label className="block text-white/80 text-sm font-medium mb-2">
-                Tags
+                Tags (comma-separated)
               </label>
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {allTags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => handleTagAdd(tag)}
-                      disabled={article.tags.includes(tag)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                        article.tags.includes(tag)
-                          ? 'bg-blue-500/30 text-blue-200 border border-blue-300/50 cursor-not-allowed'
-                          : 'bg-white/10 text-white/70 border border-white/20 hover:bg-white/20 cursor-pointer'
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-                
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    placeholder="Add custom tag..."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleTagAdd(newTag)}
-                    className="glass-button py-2 px-4"
-                  >
-                    <Plus size={16} />
-                  </button>
-                </div>
-
-                {article.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {article.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-200 border border-green-300/30"
-                      >
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => handleTagRemove(tag)}
-                          className="ml-2 hover:text-green-100"
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <input
+                type="text"
+                value={article.tags}
+                onChange={(e) => handleInputChange('tags', e.target.value)}
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder="calculus, integration, mathematics"
+              />
             </div>
 
             {/* Content */}
@@ -313,57 +231,37 @@ Use LaTeX for equations:
               />
             </div>
 
-            {/* File Attachments */}
-            <div>
-              <label className="block text-white/80 text-sm font-medium mb-2">
-                Attachments
-              </label>
-              <div className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center">
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => handleFileUpload(e.target.files)}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <Upload size={32} className="mx-auto text-white/60 mb-2" />
-                  <p className="text-white/70">Click to upload files</p>
-                  <p className="text-white/50 text-sm">PDFs, images, archives...</p>
-                </label>
+            {/* Submit Message */}
+            {submitMessage && (
+              <div className={`p-3 rounded-lg ${
+                submitMessage.includes('Error') 
+                  ? 'bg-red-500/20 border border-red-400/30' 
+                  : 'bg-green-500/20 border border-green-400/30'
+              }`}>
+                <p className={submitMessage.includes('Error') ? 'text-red-200' : 'text-green-200'}>
+                  {submitMessage}
+                </p>
               </div>
-
-              {article.attachments.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {article.attachments.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                      <span className="text-white/80">{file.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setArticle(prev => ({
-                            ...prev,
-                            attachments: prev.attachments.filter((_, i) => i !== index)
-                          }));
-                        }}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Submit Button */}
             <div className="flex justify-end pt-6 border-t border-white/10">
               <button
                 type="submit"
-                className="glass-button px-8 py-3 text-lg"
+                disabled={isSubmitting}
+                className="glass-button px-8 py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save size={20} className="mr-2" />
-                Publish Article
+                {isSubmitting ? (
+                  <div className="flex items-center">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                    Publishing...
+                  </div>
+                ) : (
+                  <>
+                    <Save size={20} className="mr-2" />
+                    Publish Article
+                  </>
+                )}
               </button>
             </div>
           </form>

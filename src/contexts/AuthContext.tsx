@@ -1,9 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiService } from '../services/api';
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+}
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  login: (username: string, password: string) => boolean;
+  user: User | null;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,31 +31,55 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Check if user is already logged in
-    const authStatus = localStorage.getItem('egmath_admin_auth');
-    if (authStatus === 'true') {
-      setIsAuthenticated(true);
+    const token = localStorage.getItem('auth_token');
+    const userData = localStorage.getItem('user_data');
+    
+    if (token && userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+      } catch (error) {
+        // Clear invalid data
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+      }
     }
+    
+    setLoading(false);
   }, []);
 
-  const login = (username: string, password: string): boolean => {
-    if (username === 'Gezoo' && password === 'Gezoo98') {
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const response = await apiService.login(email, password);
+      
+      localStorage.setItem('auth_token', response.token);
+      localStorage.setItem('user_data', JSON.stringify(response.user));
+      
+      setUser(response.user);
       setIsAuthenticated(true);
-      localStorage.setItem('egmath_admin_auth', 'true');
+      
       return true;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+    setUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem('egmath_admin_auth');
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,23 +1,56 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, User, Tag } from 'lucide-react';
-import { mockArticles } from '../data/mockArticles';
+import { useArticle } from '../hooks/useArticles';
 import ArticleContent from '../components/Articles/ArticleContent';
 import AttachmentList from '../components/Articles/AttachmentList';
 
 const ArticlePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const article = mockArticles.find(a => a.id === id);
+  const { article, loading, error } = useArticle(id!);
 
-  if (!article) {
+  if (loading) {
     return (
-      <div className="glass-card p-8 text-center">
-        <h1 className="text-2xl font-bold text-white mb-4">Article Not Found</h1>
-        <p className="text-white/80 mb-6">The article you're looking for doesn't exist.</p>
-        <Link to="/" className="glass-button">
+      <div className="max-w-4xl mx-auto space-y-8">
+        <Link
+          to="/"
+          className="inline-flex items-center text-white/80 hover:text-white transition-colors mb-6"
+        >
           <ArrowLeft size={16} className="mr-2" />
-          Back to Home
+          Back to Articles
         </Link>
+
+        <div className="glass-card p-12 text-center">
+          <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white/60 text-lg">Loading article...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !article) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8">
+        <Link
+          to="/"
+          className="inline-flex items-center text-white/80 hover:text-white transition-colors mb-6"
+        >
+          <ArrowLeft size={16} className="mr-2" />
+          Back to Articles
+        </Link>
+
+        <div className="glass-card p-8 text-center">
+          <h1 className="text-2xl font-bold text-white mb-4">
+            {error ? 'Error Loading Article' : 'Article Not Found'}
+          </h1>
+          <p className="text-white/80 mb-6">
+            {error || "The article you're looking for doesn't exist."}
+          </p>
+          <Link to="/" className="glass-button">
+            <ArrowLeft size={16} className="mr-2" />
+            Back to Home
+          </Link>
+        </div>
       </div>
     );
   }
