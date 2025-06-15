@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calculator, Home, Plus, Info, LogOut, User } from 'lucide-react';
+import { Calculator, Home, Plus, Info, LogOut, User, LogIn } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Header: React.FC = () => {
@@ -58,6 +58,18 @@ const Header: React.FC = () => {
               </Link>
             ))}
             
+            {/* Login Button - Only show if not authenticated */}
+            {!isAuthenticated && (
+              <Link
+                to="/login"
+                className="flex items-center space-x-2 px-4 py-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-300"
+              >
+                <LogIn size={18} />
+                <span className="font-medium">Login</span>
+              </Link>
+            )}
+            
+            {/* Logout Button - Only show if authenticated */}
             {isAuthenticated && (
               <button
                 onClick={handleLogout}
@@ -99,7 +111,17 @@ const Header: React.FC = () => {
                 <span className="text-xs mt-1">{label}</span>
               </Link>
             ))}
-            {isAuthenticated && (
+            
+            {/* Mobile Login/Logout */}
+            {!isAuthenticated ? (
+              <Link
+                to="/login"
+                className="flex flex-col items-center p-2 rounded-lg text-white/70 hover:text-white transition-all duration-300"
+              >
+                <LogIn size={20} />
+                <span className="text-xs mt-1">Login</span>
+              </Link>
+            ) : (
               <button
                 onClick={handleLogout}
                 className="flex flex-col items-center p-2 rounded-lg text-white/70 hover:text-white transition-all duration-300"

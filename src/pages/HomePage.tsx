@@ -1,14 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { LogIn } from 'lucide-react';
 import { mockArticles, categories, allTags } from '../data/mockArticles';
 import { SearchFilters } from '../types';
-import { useAuth } from '../contexts/AuthContext';
 import ArticleCard from '../components/Articles/ArticleCard';
 import SearchBar from '../components/Articles/SearchBar';
 
 const HomePage: React.FC = () => {
-  const { isAuthenticated } = useAuth();
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
     category: 'All',
@@ -37,30 +33,9 @@ const HomePage: React.FC = () => {
         <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent">
           Mathematical Articles
         </h1>
-        <p className="text-xl text-white/80 max-w-2xl mx-auto mb-8">
+        <p className="text-xl text-white/80 max-w-2xl mx-auto">
           Explore cutting-edge research and discoveries in mathematics, physics, and beyond
         </p>
-        
-        {/* Navigation Links */}
-        <div className="flex justify-center items-center space-x-6 mb-6">
-          <Link
-            to="/about"
-            className="glass-button px-6 py-3 text-lg font-medium hover:scale-105 transform transition-all duration-300"
-          >
-            About
-          </Link>
-          
-          {/* Login Button - Only show if not authenticated */}
-          {!isAuthenticated && (
-            <Link
-              to="/login"
-              className="inline-flex items-center space-x-2 glass-button px-6 py-3 text-lg font-medium hover:scale-105 transform transition-all duration-300"
-            >
-              <LogIn size={20} />
-              <span>Login</span>
-            </Link>
-          )}
-        </div>
       </div>
 
       <SearchBar
