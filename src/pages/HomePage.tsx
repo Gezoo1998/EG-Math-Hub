@@ -1,10 +1,14 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { LogIn } from 'lucide-react';
 import { mockArticles, categories, allTags } from '../data/mockArticles';
 import { SearchFilters } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 import ArticleCard from '../components/Articles/ArticleCard';
 import SearchBar from '../components/Articles/SearchBar';
 
 const HomePage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
     category: 'All',
@@ -31,11 +35,24 @@ const HomePage: React.FC = () => {
     <div className="space-y-8">
       <div className="text-center mb-12">
         <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent">
-          Scientific Articles
+          Mathematical Articles
         </h1>
-        <p className="text-xl text-white/80 max-w-2xl mx-auto">
+        <p className="text-xl text-white/80 max-w-2xl mx-auto mb-6">
           Explore cutting-edge research and discoveries in mathematics, physics, and beyond
         </p>
+        
+        {/* Admin Login Button - Only show if not authenticated */}
+        {!isAuthenticated && (
+          <div className="flex justify-center">
+            <Link
+              to="/login"
+              className="inline-flex items-center space-x-2 glass-button px-6 py-3 text-lg font-medium hover:scale-105 transform transition-all duration-300"
+            >
+              <LogIn size={20} />
+              <span>Admin Login</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       <SearchBar
