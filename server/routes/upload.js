@@ -1,27 +1,23 @@
-import express from 'express';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
-import { fileURLToPath } from 'url';
-import { runQuery, getRow } from '../database/init.js';
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
+const db = require('../database/init');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Ensure upload directory exists
-const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadDir);
+    cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
@@ -29,212 +25,106 @@ const storage = multer.diskStorage({
   }
 });
 
-const fileFilter = (req, file, cb) => {
-  // Allow common file types
-  const allowedTypes = [
-    'application/pdf',
-    'application/zip',
-    'application/x-zip-compressed',
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'text/plain',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ];
-
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('File type not allowed'), false);
-  }
-};
-
 const upload = multer({
   storage,
-  fileFilter,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024 // 10MB default
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow common file types
+    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt|md/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
   }
 });
 
-// Upload files for article (admin only)
-router.post('/:articleId', [
-  authenticateToken,
-  requireAdmin,
-  upload.array('files', 10) // Max 10 files
-], async (req, res) => {
-  try {
-    const { articleId } = req.params;
+// Upload file and attach to article
+router.post('/:articleId', authenticateToken, upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
 
-    // Verify article exists
-    const article = await getRow('SELECT id FROM articles WHERE id = ?', [articleId]);
+  const { articleId } = req.params;
+  const userId = req.user.userId;
+
+  // Verify user owns the article
+  db.get('SELECT * FROM articles WHERE id = ? AND author_id = ?', [articleId, userId], (err, article) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+
     if (!article) {
-      return res.status(404).json({ error: 'Article not found' });
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Article not found or unauthorized' });
     }
 
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: 'No files uploaded' });
-    }
-
-    const uploadedFiles = [];
-
-    for (const file of req.files) {
-      const attachmentId = uuidv4();
-      const fileType = getFileType(file.mimetype);
-
-      // Save file info to database
-      await runQuery(`
-        INSERT INTO attachments (id, article_id, name, original_name, type, size, file_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [
-        attachmentId,
-        articleId,
-        file.filename,
-        file.originalname,
-        fileType,
-        file.size,
-        file.path
-      ]);
-
-      uploadedFiles.push({
-        id: attachmentId,
-        name: file.originalname,
-        type: fileType,
-        size: formatFileSize(file.size)
-      });
-    }
-
-    res.json({
-      message: 'Files uploaded successfully',
-      files: uploadedFiles
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    
-    // Clean up uploaded files on error
-    if (req.files) {
-      req.files.forEach(file => {
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
+    // Save attachment info to database
+    db.run(
+      'INSERT INTO attachments (article_id, filename, original_name, file_path, file_size, mime_type) VALUES (?, ?, ?, ?, ?, ?)',
+      [articleId, req.file.filename, req.file.originalname, req.file.path, req.file.size, req.file.mimetype],
+      function(err) {
+        if (err) {
+          // Clean up uploaded file
+          fs.unlinkSync(req.file.path);
+          return res.status(500).json({ error: 'Failed to save attachment' });
         }
-      });
-    }
 
-    res.status(500).json({ error: 'Failed to upload files' });
-  }
+        res.json({
+          message: 'File uploaded successfully',
+          attachment: {
+            id: this.lastID,
+            filename: req.file.filename,
+            originalName: req.file.originalname,
+            size: req.file.size,
+            mimeType: req.file.mimetype
+          }
+        });
+      }
+    );
+  });
 });
 
-// Download file (public)
-router.get('/download/:attachmentId', async (req, res) => {
-  try {
-    const { attachmentId } = req.params;
+// Delete attachment
+router.delete('/attachment/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.userId;
 
-    const attachment = await getRow(
-      'SELECT * FROM attachments WHERE id = ?',
-      [attachmentId]
-    );
-
-    if (!attachment) {
-      return res.status(404).json({ error: 'File not found' });
+  // Get attachment and verify ownership
+  db.get(`
+    SELECT att.*, a.author_id 
+    FROM attachments att 
+    JOIN articles a ON att.article_id = a.id 
+    WHERE att.id = ?
+  `, [id], (err, attachment) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
     }
 
-    // Check if file exists on disk
-    if (!fs.existsSync(attachment.file_path)) {
-      return res.status(404).json({ error: 'File not found on disk' });
+    if (!attachment || attachment.author_id !== userId) {
+      return res.status(404).json({ error: 'Attachment not found or unauthorized' });
     }
 
-    // Set appropriate headers
-    res.setHeader('Content-Disposition', `attachment; filename="${attachment.original_name}"`);
-    res.setHeader('Content-Type', getMimeType(attachment.type));
-
-    // Stream the file
-    const fileStream = fs.createReadStream(attachment.file_path);
-    fileStream.pipe(res);
-  } catch (error) {
-    console.error('Download error:', error);
-    res.status(500).json({ error: 'Failed to download file' });
-  }
-});
-
-// Delete attachment (admin only)
-router.delete('/:attachmentId', [authenticateToken, requireAdmin], async (req, res) => {
-  try {
-    const { attachmentId } = req.params;
-
-    const attachment = await getRow(
-      'SELECT * FROM attachments WHERE id = ?',
-      [attachmentId]
-    );
-
-    if (!attachment) {
-      return res.status(404).json({ error: 'Attachment not found' });
-    }
-
-    // Delete from database
-    await runQuery('DELETE FROM attachments WHERE id = ?', [attachmentId]);
-
-    // Delete file from disk
+    // Delete file from filesystem
     if (fs.existsSync(attachment.file_path)) {
       fs.unlinkSync(attachment.file_path);
     }
 
-    res.json({ message: 'Attachment deleted successfully' });
-  } catch (error) {
-    console.error('Delete attachment error:', error);
-    res.status(500).json({ error: 'Failed to delete attachment' });
-  }
+    // Delete from database
+    db.run('DELETE FROM attachments WHERE id = ?', [id], function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Failed to delete attachment' });
+      }
+
+      res.json({ message: 'Attachment deleted successfully' });
+    });
+  });
 });
 
-// Get attachments for article (public)
-router.get('/article/:articleId', async (req, res) => {
-  try {
-    const { articleId } = req.params;
-
-    const attachments = await getAllRows(
-      'SELECT id, name, original_name, type, size FROM attachments WHERE article_id = ?',
-      [articleId]
-    );
-
-    const formattedAttachments = attachments.map(att => ({
-      id: att.id,
-      name: att.original_name,
-      type: att.type,
-      size: formatFileSize(att.size),
-      url: `/api/upload/download/${att.id}`
-    }));
-
-    res.json(formattedAttachments);
-  } catch (error) {
-    console.error('Get attachments error:', error);
-    res.status(500).json({ error: 'Failed to fetch attachments' });
-  }
-});
-
-// Helper functions
-function getFileType(mimetype) {
-  if (mimetype.includes('pdf')) return 'pdf';
-  if (mimetype.includes('zip')) return 'zip';
-  if (mimetype.includes('image')) return 'image';
-  return 'other';
-}
-
-function getMimeType(type) {
-  const mimeTypes = {
-    'pdf': 'application/pdf',
-    'zip': 'application/zip',
-    'image': 'image/jpeg',
-    'other': 'application/octet-stream'
-  };
-  return mimeTypes[type] || 'application/octet-stream';
-}
-
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-export default router;
+module.exports = router;
