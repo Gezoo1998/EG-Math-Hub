@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'eg-math-backend-production.up.railway.app';
 
 // Types for API responses
 export interface LoginResponse {
