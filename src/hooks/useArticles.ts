@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiService, ArticleResponse } from '../services/api';
+import { apiService, ArticleResponse, API_BASE_URL } from '../services/api';
 import { Article } from '../types';
 
 // Transform API response to frontend Article type
@@ -22,7 +22,7 @@ const transformArticle = (apiArticle: ArticleResponse): Article => {
       type: att.mime_type.includes('pdf') ? 'pdf' as const : 
             att.mime_type.includes('zip') ? 'zip' as const :
             att.mime_type.includes('image') ? 'image' as const : 'other' as const,
-      url: `http://localhost:3001/uploads/${att.filename}`,
+      url: `${API_BASE_URL}/uploads/${att.filename}`,
       size: `${(att.file_size / 1024).toFixed(1)} KB`
     })),
     equations: [] // Could be extracted from content if needed
