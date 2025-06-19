@@ -1,4 +1,4 @@
-const API_BASE_URL = 'eg-math-backend-production.up.railway.app';
+export const API_BASE_URL = 'https://eg-math-backend-production.up.railway.app/api';
 
 // Types for API responses
 export interface LoginResponse {
